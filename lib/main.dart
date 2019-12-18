@@ -58,12 +58,19 @@ class _MyHomePageState extends State<MyHomePage> {
     if (image == null) {
       return;
     }
+    setState(() {
+      // 同じパスだとキャッシュ効いてしまうので削除
+      if (_image != null) {
+        imageCache.evict(FileImage(_image));
+      }
+      _image = image;
+    });
 
     var result = await opencv.invokeMethod('toPerspectiveTransformation',
         <String, dynamic>{'srcPath': image.path});
 
     setState(() {
-      _image = File(result);
+      _image = File(result);      
     });
   }
 

@@ -24,6 +24,12 @@ static NSString *const OPENCV_CHANNEL = @"api.opencv.dev/opencv";
       // 画像ファイルを読み込み
       UIImage *src = [UIImage imageWithContentsOfFile:srcpath];
 
+      // exif等を考慮した画像の回転
+      UIGraphicsBeginImageContext(src.size);
+      [src drawInRect:CGRectMake(0, 0, src.size.width, src.size.height)];
+      src = UIGraphicsGetImageFromCurrentImageContext();
+      UIGraphicsEndImageContext();
+
       // 画像変換
       UIImage *dst = [cv toPerspectiveTransformationImg:src];
 

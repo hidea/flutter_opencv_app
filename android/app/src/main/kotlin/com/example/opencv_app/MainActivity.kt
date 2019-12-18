@@ -50,14 +50,32 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private fun readImageFromFile(path:String?): Bitmap? {
+    private fun rotateImage(source: Bitmap, angle: Float): Bitmap? {
+        val matrix = Matrix()
+        matrix.postRotate(angle)
+        return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+    }
+
+    private fun readImageFromFileWithRotate(path:String?): Bitmap? {
         try {
-            return BitmapFactory.decodeFile(path)
-        }
-        catch (e: IOException) {
+            val ei = ExifInterface(path)
+            val orientation = ei.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED)
+            val options = BitmapFactory.Options()
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888
+            val bitmap = BitmapFactory.decodeFile(path, options)
+            var rotatedBitmap: Bitmap? = null
+            when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> rotatedBitmap = rotateImage(bitmap, 90.0f)
+                ExifInterface.ORIENTATION_ROTATE_180 -> rotatedBitmap = rotateImage(bitmap, 180.0f)
+                ExifInterface.ORIENTATION_ROTATE_270 -> rotatedBitmap = rotateImage(bitmap, 270.0f)
+                ExifInterface.ORIENTATION_NORMAL -> rotatedBitmap = bitmap
+                else -> rotatedBitmap = bitmap
+            }
+            return rotatedBitmap
+        } catch (e: IOException) {
             e.printStackTrace()
-            return  null
         }
+        return null
     }
 
     private fun saveImageToFile(img:Bitmap): String? {
@@ -93,22 +111,20 @@ class MainActivity: FlutterActivity() {
 
     private fun toPerspectiveTransformationImg(srcpath: String): String? {
         // Bitmapを読み込み
-        val img = readImageFromFile(srcpath)
+        val img = readImageFromFileWithRotate(srcpath)
         // BitmapをMatに変換する
         var matSource = Mat()
         Utils.bitmapToMat(img, matSource)
 
         // 前処理
-
+        var matDest = Mat()
         // グレースケール変換
-        Imgproc.cvtColor(matSource, matSource, Imgproc.COLOR_BGR2GRAY)
-        // ぼかしをいれる
-        Imgproc.blur(matSource, matSource, Size(5.0, 5.0))
+        Imgproc.cvtColor(matSource, matDest, Imgproc.COLOR_BGR2GRAY)
         // 2値化
-        Imgproc.adaptiveThreshold(matSource, matSource, 255.0, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, 21, 16.0)
+        Imgproc.threshold(matDest, matDest, 0.0, 255.0, Imgproc.THRESH_OTSU)
         // Cannyアルゴリズムを使ったエッジ検出
         var matCanny = Mat()
-        Imgproc.Canny(matSource, matCanny,75.0, 200.0)
+        Imgproc.Canny(matDest, matCanny,75.0, 200.0)
         // 膨張
         var matKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(9.0, 9.0))
         Imgproc.dilate(matCanny, matCanny, matKernel);
@@ -132,7 +148,7 @@ class MainActivity: FlutterActivity() {
             val contour2f = MatOfPoint2f()
             vctContour.convertTo(contour2f, CvType.CV_32FC2)
             var arclen = Imgproc.arcLength(contour2f, true)
-            Imgproc.approxPolyDP(contour2f, approxCurve, 0.02 * arclen, true)
+            Imgproc.approxPolyDP(contour2f, approxCurve, 0.025 * arclen, true)
 
             // 4辺の矩形なら採用
             if (approxCurve.total() == 4L) {
@@ -148,10 +164,10 @@ class MainActivity: FlutterActivity() {
         val width = img!!.width;
         val height = (width / 1.654).toInt();
         var ptDst = Mat(4, 2, CvType.CV_32F)
-        ptDst.put(0, 0, floatArrayOf(0.0f, 0.0f))
-        ptDst.put(1, 0, floatArrayOf(0.0f, height.toFloat()))
-        ptDst.put(2, 0, floatArrayOf(width.toFloat(), height.toFloat()))
-        ptDst.put(3, 0, floatArrayOf(width.toFloat(), 0.0f))
+        ptDst.put(0, 0, floatArrayOf(0.0f, height.toFloat()))
+        ptDst.put(1, 0, floatArrayOf(width.toFloat(), height.toFloat()))
+        ptDst.put(2, 0, floatArrayOf(width.toFloat(), 0.0f))
+        ptDst.put(3, 0, floatArrayOf(0.0f, 0.0f))
 
         // 変換行列
         var matTrans = Imgproc.getPerspectiveTransform(ptSrc, ptDst)

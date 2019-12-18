@@ -20,16 +20,14 @@
     UIImageToMat(img, matSource);
 
     // 前処理
-
+    cv::Mat matDest;
     // グレースケール変換
-    cv::cvtColor(matSource, matSource, cv::COLOR_BGR2GRAY);
-    // ぼかしをいれる
-    cv::blur(matSource, matSource, cv::Size(5.0, 5.0));
+    cv::cvtColor(matSource, matDest, cv::COLOR_BGR2GRAY);
     // 2値化
-    cv::adaptiveThreshold(matSource, matSource, 255.0, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 21, 16);
+    cv::threshold(matDest, matDest, 0, 255, cv::THRESH_BINARY|cv::THRESH_OTSU);
     // Cannyアルゴリズムを使ったエッジ検出
     cv::Mat matCanny;
-    cv::Canny(matSource, matCanny, 75, 200);
+    cv::Canny(matDest, matCanny, 75, 200);
     // 膨張
     cv::Mat matKernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9.0, 9.0));
     cv::dilate(matCanny, matCanny, matKernel);
@@ -51,7 +49,7 @@
         // 輪郭をまるめる
         std::vector<cv::Point> approxCurve;
         double arclen = cv::arcLength(vctContours[i], true);
-        cv::approxPolyDP(vctContours[i], approxCurve, 0.02 * arclen, true);
+        cv::approxPolyDP(vctContours[i], approxCurve, 0.025 * arclen, true);
 
         // 4辺の矩形なら採用
         if (approxCurve.size() == 4) {
@@ -69,10 +67,10 @@
     float width = img.size.width;
     float height = width / 1.654;
     std::vector<cv::Point2f> ptDst;
-    ptDst.push_back(cv::Point2f(0, 0));
     ptDst.push_back(cv::Point2f(0, height));
     ptDst.push_back(cv::Point2f(width, height));
     ptDst.push_back(cv::Point2f(width, 0));
+    ptDst.push_back(cv::Point2f(0, 0));
     
     // 変換行列
     cv::Mat matTrans = cv::getPerspectiveTransform(ptSrc, ptDst);
